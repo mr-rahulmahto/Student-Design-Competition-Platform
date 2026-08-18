@@ -10,6 +10,7 @@ const submissionRoutes = require('./routes/submissions');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
+let mongoConnectionPromise = null;
 
 const allowedOrigins = (process.env.CLIENT_URL || 'http://localhost:5173,http://127.0.0.1:5173,http://localhost:5174,http://127.0.0.1:5174')
   .split(',')
@@ -28,6 +29,34 @@ app.use(cors({
 
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+
+const connectDB = async () => {
+  if (!process.env.MONGO_URI) {
+    throw new Error('MONGO_URI is missing in server/.env');
+  }
+
+  if (mongoose.connection.readyState === 1) {
+    return mongoose.connection;
+  }
+
+  if (!mongoConnectionPromise) {
+    mongoConnectionPromise = mongoose.connect(process.env.MONGO_URI, {
+      serverSelectionTimeoutMS: 15000
+    });
+  }
+
+  await mongoConnectionPromise;
+  return mongoose.connection;
+};
+
+app.use(async (req, res, next) => {
+  try {
+    await connectDB();
+    next();
+  } catch (err) {
+    next(err);
+  }
+});
 
 app.get('/', (req, res) => {
   res.status(200).json({
@@ -66,14 +95,7 @@ app.use((err, req, res, next) => {
 
 const startServer = async () => {
   try {
-    if (!process.env.MONGO_URI) {
-      throw new Error('MONGO_URI is missing in server/.env');
-    }
-
-    await mongoose.connect(process.env.MONGO_URI, {
-      serverSelectionTimeoutMS: 15000
-    });
-
+    await connectDB();
     console.log('Connected to MongoDB');
     app.listen(PORT, () => {
       console.log(`DesignPulse API running at http://localhost:${PORT}`);
@@ -84,4 +106,8 @@ const startServer = async () => {
   }
 };
 
-startServer();
+if (require.main === module) {
+  startServer();
+}
+
+module.exports = app;
