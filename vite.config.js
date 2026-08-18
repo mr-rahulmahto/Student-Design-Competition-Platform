@@ -8,7 +8,7 @@ export default defineConfig({
   server: {
     proxy: {
       '/api': {
-        target: 'http://localhost:5000',
+        target: 'https://student-design-competition-platform.vercel.app/',
         changeOrigin: true,
         secure: false,
       },
