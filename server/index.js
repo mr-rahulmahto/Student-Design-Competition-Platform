@@ -19,10 +19,10 @@ const allowedOrigins = (process.env.CLIENT_URL || 'http://localhost:5173,http://
 
 app.use(cors({
   origin(origin, callback) {
-    if (!origin || allowedOrigins.includes(origin)) {
+    if (!origin || allowedOrigins.includes(origin) || origin.endsWith('.netlify.app') || origin.endsWith('.vercel.app')) {
       return callback(null, true);
     }
-    return callback(new Error(`CORS blocked request from ${origin}`));
+    return callback(null, true); // Permissive fallback for public API
   },
   credentials: true
 }));

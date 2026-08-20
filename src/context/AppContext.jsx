@@ -1,7 +1,7 @@
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 
 const AppContext = createContext();
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '/api';
+const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL || 'https://student-design-competition-platform.vercel.app/api').replace(/\/+$/, '');
 
 const DEFAULT_COMPETITIONS = [
   {
