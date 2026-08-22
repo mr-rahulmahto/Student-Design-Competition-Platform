@@ -282,7 +282,8 @@ const readStoredValue = (key, fallback) => {
 
 const normalizeCompetition = (competition) => ({
   ...competition,
-  id: competition.id || competition._id,
+  id: String(competition.id || competition._id || ''),
+  _id: String(competition._id || competition.id || ''),
   deadline: competition.deadline,
   startDate: competition.startDate
 });
@@ -696,36 +697,38 @@ export const AppProvider = ({ children }) => {
   };
 
   const createSubmission = async (subData) => {
-    const comp = competitions.find(c => c.id === subData.competitionId) || competitions[0];
-    const localSub = {
-      ...subData,
-      id: 'sub-' + Date.now(),
-      competitionTitle: comp.title,
-      organizer: comp.organizer,
-      submittedAt: new Date().toISOString(),
-      studentName: user.name,
-      studentEmail: user.email,
-      studentAvatar: user.avatar
-    };
+    // Ensure competitionId is always a plain string (MongoDB ObjectId)
+    const compId = String(subData.competitionId || '');
+    const comp = competitions.find(c => c.id === compId || c._id === compId) || competitions[0];
 
     try {
-      const data = await requestApi('/submissions', {
+      const response = await fetch(`${API_BASE_URL}/submissions`, {
         method: 'POST',
-        body: JSON.stringify(subData)
+        headers: {
+          'Content-Type': 'application/json',
+          ...(authToken ? { Authorization: `Bearer ${authToken}` } : {})
+        },
+        body: JSON.stringify({ ...subData, competitionId: comp._id || comp.id || compId })
       });
-      if (data && data.submission) {
+
+      const data = await response.json().catch(() => ({}));
+
+      if (response.ok && data.success && data.submission) {
         const created = normalizeSubmission(data.submission);
         setSubmissions(prev => [created, ...prev]);
-        addNotification('Submission Received! 🚀', `Your entry for "${created.competitionTitle}" was submitted.`, 'success');
+        addNotification('Submission Received! 🚀', `Your entry for "${created.competitionTitle}" was submitted to MongoDB.`, 'success');
         return created;
+      } else {
+        const errMsg = data.message || 'Failed to save submission.';
+        addNotification('Submission Failed', errMsg, 'error');
+        console.error('Submission error from server:', errMsg);
+        return null;
       }
-    } catch {
-      // Fallback
+    } catch (err) {
+      console.error('Submission network error:', err);
+      addNotification('Server / MongoDB Error', 'Cannot connect to server. Ensure backend is running on port 5000.', 'error');
+      return null;
     }
-
-    setSubmissions(prev => [localSub, ...prev]);
-    addNotification('Submission Received! 🚀', `Your entry for "${comp.title}" was submitted.`, 'success');
-    return localSub;
   };
 
   const updateSubmission = async (subId, updatedData) => {
