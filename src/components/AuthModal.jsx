@@ -153,14 +153,6 @@ export const AuthModal = () => {
     });
   };
 
-  const handleQuickDemoStudent = () => {
-    loginUser('Rahul.student@designpulse.edu', 'student123', 'student');
-  };
-
-  const handleQuickDemoAdmin = () => {
-    loginUser('admin@designpulse.org', 'admin123', 'admin');
-  };
-
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs animate-in fade-in">
 
@@ -293,30 +285,6 @@ export const AuthModal = () => {
               <LogIn className="w-4 h-4" />
               <span>Sign In as {role === 'student' ? 'Student' : 'Admin'}</span>
             </button>
-
-            {/* Quick Demo Access Buttons */}
-            <div className="pt-4 border-t border-slate-100 space-y-2 text-center">
-              <span className="text-[11px] text-slate-500 uppercase font-bold tracking-wider block">
-                Instant 1-Click Demo Login
-              </span>
-              <div className="grid grid-cols-2 gap-2">
-                <button
-                  type="button"
-                  onClick={handleQuickDemoStudent}
-                  className="py-2.5 px-3 rounded-xl bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 text-indigo-700 text-xs font-bold transition-all"
-                >
-                  Student Demo Login
-                </button>
-
-                <button
-                  type="button"
-                  onClick={handleQuickDemoAdmin}
-                  className="py-2.5 px-3 rounded-xl bg-purple-50 hover:bg-purple-100 border border-purple-200 text-purple-700 text-xs font-bold transition-all"
-                >
-                  Admin Demo Login
-                </button>
-              </div>
-            </div>
           </form>
         ) : activeTab === 'forgot' ? (
           <form onSubmit={handleForgotPasswordSubmit} className="space-y-4">

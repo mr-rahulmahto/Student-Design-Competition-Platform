@@ -78,10 +78,6 @@ export const AdminPanel = () => {
     setAuthError('');
   };
 
-  const handleQuickDemoAdminUnlock = () => {
-    loginUser('admin@designpulse.org', 'admin123', 'admin');
-  };
-
   const handleCreateCompetition = async (e) => {
     e.preventDefault();
     if (!newTitle.trim() || !newOrganizer.trim()) {
@@ -226,31 +222,15 @@ export const AdminPanel = () => {
               <LogIn className="w-4 h-4" />
               <span>Sign In & Access Admin Console</span>
             </button>
-          </form>
 
-          {/* Fast Track Demo Unlock Button */}
-          <div className="pt-4 border-t border-slate-100 text-center space-y-3">
-            <span className="text-[11px] text-slate-500 uppercase font-bold tracking-wider block">
-              Quick 1-Click Evaluator Demo Access
-            </span>
-            
             <button
               type="button"
-              onClick={handleQuickDemoAdminUnlock}
-              className="w-full py-2.5 px-4 rounded-xl bg-purple-50 hover:bg-purple-100 border border-purple-200 text-purple-700 text-xs font-bold transition-all flex items-center justify-center space-x-2 shadow-2xs"
-            >
-              <ShieldCheck className="w-4 h-4 text-purple-600" />
-              <span>Unlock Admin Panel (1-Click Demo)</span>
-            </button>
-
-            <button
               onClick={() => navigateTo('competitions')}
-              className="text-xs text-slate-500 hover:text-indigo-600 transition-colors block mx-auto pt-1 font-medium"
+              className="text-xs text-slate-500 hover:text-indigo-600 transition-colors block mx-auto pt-2 font-medium"
             >
               Return to Student Portal
             </button>
-          </div>
-
+          </form>
         </div>
 
       </div>

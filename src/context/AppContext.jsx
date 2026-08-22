@@ -309,8 +309,8 @@ export const AppProvider = ({ children }) => {
   const [competitions, setCompetitions] = useState(() => readStoredValue('designpulse_competitions', DEFAULT_COMPETITIONS));
   const [submissions, setSubmissions] = useState(() => readStoredValue('designpulse_submissions', DEFAULT_SUBMISSIONS));
   const [user, setUser] = useState(() => normalizeUser(readStoredValue('designpulse_user', guestUser)));
-  const [authToken, setAuthToken] = useState(() => localStorage.getItem('designpulse_auth_token') || 'demo-token');
-  const [isAuthenticated, setIsAuthenticated] = useState(() => Boolean(localStorage.getItem('designpulse_auth_token') || true));
+  const [authToken, setAuthToken] = useState(() => localStorage.getItem('designpulse_auth_token') || '');
+  const [isAuthenticated, setIsAuthenticated] = useState(() => Boolean(localStorage.getItem('designpulse_auth_token')));
   const [isLoadingData, setIsLoadingData] = useState(false);
 
   const [showAuthModal, setShowAuthModal] = useState(false);
@@ -320,18 +320,10 @@ export const AppProvider = ({ children }) => {
   const [notifications, setNotifications] = useState([
     {
       id: 'notif-1',
-      title: 'Submission Shortlisted 🎉',
-      message: 'Your project "SkillBridge" has been confirmed by Unified Mentor evaluators.',
+      title: 'MongoDB Connected',
+      message: 'Database connection active. You can register, sign in, and manage submissions.',
       type: 'success',
-      timestamp: new Date(Date.now() - 3600000).toISOString(),
-      read: false
-    },
-    {
-      id: 'notif-2',
-      title: 'Deadline Approaching',
-      message: 'NID Design Excellence Awards closing in 3 days. Finalize your submission brief.',
-      type: 'warning',
-      timestamp: new Date(Date.now() - 7200000).toISOString(),
+      timestamp: new Date().toISOString(),
       read: false
     }
   ]);
@@ -364,7 +356,6 @@ export const AppProvider = ({ children }) => {
       }
       return data;
     } catch (err) {
-      // Return null to allow graceful fallback to local state
       return null;
     }
   }, [authToken]);
@@ -444,73 +435,38 @@ export const AppProvider = ({ children }) => {
       return false;
     }
 
-    let serverReachable = false;
-
     try {
       const response = await fetch(`${API_BASE_URL}/auth/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password, role })
-      }).catch(() => null);
+        body: JSON.stringify({ email: email.trim(), password: password.trim(), role })
+      });
 
-      if (response) {
-        serverReachable = true;
-        const data = await response.json();
+      const data = await response.json().catch(() => ({}));
 
-        if (response.ok && data.success) {
-          // ✅ Successful login from database
-          const loggedUser = normalizeUser(data.user);
-          setUser(loggedUser);
-          if (loggedUser.savedCompetitions && Array.isArray(loggedUser.savedCompetitions)) {
-            setSavedCompetitions(loggedUser.savedCompetitions.map(String));
-          }
-          setAuthToken(data.token);
-          setIsAuthenticated(true);
-          setShowAuthModal(false);
-          setCurrentRoute(loggedUser.role === 'admin' ? 'admin' : 'dashboard');
-          addNotification('Signed In', `Welcome back, ${loggedUser.name}.`, 'success');
-          return true;
-        } else {
-          // Server reachable but rejected credentials — show exact error
-          const errorMsg = data.message || 'Incorrect email or password. Please try again.';
-          addNotification('Login Failed', errorMsg, 'error');
-          return false;
+      if (response.ok && data.success) {
+        const loggedUser = normalizeUser(data.user);
+        setUser(loggedUser);
+        if (loggedUser.savedCompetitions && Array.isArray(loggedUser.savedCompetitions)) {
+          setSavedCompetitions(loggedUser.savedCompetitions.map(String));
         }
+        setAuthToken(data.token);
+        setIsAuthenticated(true);
+        setShowAuthModal(false);
+        setCurrentRoute(loggedUser.role === 'admin' ? 'admin' : 'dashboard');
+        addNotification('Signed In Successfully', `Welcome back, ${loggedUser.name}!`, 'success');
+        refreshAllData();
+        return true;
+      } else {
+        const errorMsg = data.message || 'Incorrect credentials. Please check your email and password.';
+        addNotification('Login Failed', errorMsg, 'error');
+        return false;
       }
-    } catch {
-      // Network error — server is offline, fall through to demo fallback
+    } catch (err) {
+      console.error('Login error:', err);
+      addNotification('Server / MongoDB Error', 'Cannot reach server or MongoDB database. Ensure server is running.', 'error');
+      return false;
     }
-
-    // Only reach here if server is completely unreachable (offline / no backend)
-    if (!serverReachable) {
-      const isDemoAdmin = email.includes('admin') || role === 'admin';
-      const fallbackUser = isDemoAdmin ? {
-        id: 'usr-admin-1',
-        name: 'Contest Administrator',
-        email: email || 'admin@designpulse.org',
-        role: 'admin',
-        institution: 'Unified Mentor Competition Board',
-        degree: 'Design Jury Executive',
-        bio: 'Managing national student competitions and evaluating submissions.',
-        skills: ['Competition Management', 'Jury Evaluation', 'Design Direction'],
-        avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=300&q=80',
-        organizerName: 'Unified Mentor Competition Board'
-      } : {
-        ...guestUser,
-        email: email || 'rahul.student@designpulse.edu',
-        role: 'student'
-      };
-
-      setUser(fallbackUser);
-      setAuthToken('demo-token-' + Date.now());
-      setIsAuthenticated(true);
-      setShowAuthModal(false);
-      setCurrentRoute(fallbackUser.role === 'admin' ? 'admin' : 'dashboard');
-      addNotification('Signed In (Offline Mode)', `Welcome, ${fallbackUser.name}. Running in demo mode.`, 'info');
-      return true;
-    }
-
-    return false;
   };
 
   const registerStudent = async (studentData) => {
@@ -537,52 +493,54 @@ export const AppProvider = ({ children }) => {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)
-      }).catch(() => null);
+      });
 
-      if (response && response.ok) {
-        const data = await response.json();
-        if (data.success) {
-          const createdUser = normalizeUser(data.user);
-          setUser(createdUser);
-          if (createdUser.savedCompetitions && Array.isArray(createdUser.savedCompetitions)) {
-            setSavedCompetitions(createdUser.savedCompetitions.map(String));
-          }
-          setAuthToken(data.token);
-          setIsAuthenticated(true);
-          setShowAuthModal(false);
-          setCurrentRoute(nextRoute);
-          addNotification('Account Created', `Welcome, ${createdUser.name}.`, 'success');
-          return true;
+      const data = await response.json().catch(() => ({}));
+
+      if (response.ok && data.success) {
+        const createdUser = normalizeUser(data.user);
+        setUser(createdUser);
+        if (createdUser.savedCompetitions && Array.isArray(createdUser.savedCompetitions)) {
+          setSavedCompetitions(createdUser.savedCompetitions.map(String));
         }
+        setAuthToken(data.token);
+        setIsAuthenticated(true);
+        setShowAuthModal(false);
+        setCurrentRoute(nextRoute || (createdUser.role === 'admin' ? 'admin' : 'dashboard'));
+        addNotification('Account Created', `Welcome to DesignPulse, ${createdUser.name}!`, 'success');
+        refreshAllData();
+        return true;
+      } else {
+        const errorMsg = data.message || 'Registration failed. Please check your details.';
+        addNotification('Registration Failed', errorMsg, 'error');
+        return false;
       }
-    } catch {
-      // Fallback
+    } catch (err) {
+      console.error('Register error:', err);
+      addNotification('Server / MongoDB Error', 'Cannot reach server or MongoDB database. Ensure server is running.', 'error');
+      return false;
     }
-
-    const localNewUser = normalizeUser({
-      ...payload,
-      id: 'usr-' + Date.now()
-    });
-    setUser(localNewUser);
-    setAuthToken('demo-token-' + Date.now());
-    setIsAuthenticated(true);
-    setShowAuthModal(false);
-    setCurrentRoute(nextRoute);
-    addNotification('Account Registered', `Welcome, ${localNewUser.name}!`, 'success');
-    return true;
   };
 
   const resetPassword = async ({ email, role, newPassword }) => {
     try {
-      await requestApi('/auth/forgot-password', {
+      const response = await fetch(`${API_BASE_URL}/auth/forgot-password`, {
         method: 'POST',
-        body: JSON.stringify({ email, role, newPassword })
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: email.trim(), role, newPassword })
       });
-    } catch {
-      // Local fallback
+      const data = await response.json().catch(() => ({}));
+      if (response.ok && data.success) {
+        addNotification('Password Updated', data.message || 'Your password has been updated.', 'success');
+        return true;
+      } else {
+        addNotification('Password Reset Failed', data.message || 'Unable to update password.', 'error');
+        return false;
+      }
+    } catch (err) {
+      addNotification('Server / MongoDB Error', 'Cannot reach server or MongoDB database.', 'error');
+      return false;
     }
-    addNotification('Password Updated', 'Your password has been updated.', 'success');
-    return true;
   };
 
   const logoutUser = () => {

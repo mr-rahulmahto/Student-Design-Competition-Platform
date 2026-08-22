@@ -42,6 +42,9 @@ const connectDB = async () => {
   if (!mongoConnectionPromise) {
     mongoConnectionPromise = mongoose.connect(process.env.MONGO_URI, {
       serverSelectionTimeoutMS: 15000
+    }).catch((err) => {
+      mongoConnectionPromise = null;
+      throw err;
     });
   }
 
