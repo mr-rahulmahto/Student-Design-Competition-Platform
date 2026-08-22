@@ -74,7 +74,7 @@ export const SubmissionWorkbench = () => {
   };
 
   const isValidUrl = (url) => {
-    if (!url.trim()) return true;
+    if (!url || typeof url !== 'string' || !url.trim()) return true;
     try {
       new URL(url);
       return true;
@@ -95,23 +95,26 @@ export const SubmissionWorkbench = () => {
     }
 
     if (!isValidUrl(figmaUrl) || !isValidUrl(githubUrl)) {
-      alert('Please enter valid URLs for prototype and repository links.');
+      alert('Please enter valid URLs (starting with http:// or https://) for prototype and repository links.');
       return;
     }
 
     setIsSubmitting(true);
 
+    const compId = String(competition?._id || competition?.id || '');
     const submissionPayload = {
-      competitionId: competition.id,
-      projectTitle,
-      tagline,
-      category,
-      summary,
+      competitionId: compId,
+      competitionTitle: competition?.title || 'Design Competition',
+      organizer: competition?.organizer || '',
+      projectTitle: projectTitle.trim(),
+      tagline: tagline.trim(),
+      category: category || competition?.category || 'UI/UX Design',
+      summary: summary.trim(),
       status,
       files,
       links: [
-        { label: 'Figma / Interactive Link', url: figmaUrl || 'https://figma.com/@project-demo' },
-        { label: 'Source Repository / Video', url: githubUrl || 'https://youtube.com/@demo-video' }
+        { label: 'Figma / Interactive Link', url: figmaUrl.trim() || 'https://figma.com/@project-demo' },
+        { label: 'Source Repository / Video', url: githubUrl.trim() || 'https://youtube.com/@demo-video' }
       ]
     };
 

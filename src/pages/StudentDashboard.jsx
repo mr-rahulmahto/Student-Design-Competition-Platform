@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { useApp } from '../context/AppContext';
 import { StatusBadge } from '../components/StatusBadge';
 import { DeadlineCountdown } from '../components/DeadlineCountdown';
@@ -21,8 +21,15 @@ export const StudentDashboard = () => {
     competitions, 
     savedCompetitions, 
     navigateTo,
+    loadSubmissions,
     notifications 
   } = useApp();
+
+  useEffect(() => {
+    if (loadSubmissions) {
+      loadSubmissions();
+    }
+  }, [loadSubmissions]);
 
   const activeSubmissions = submissions.filter(s => s.status !== 'Draft');
   const confirmedSubmissions = submissions.filter(s => s.status === 'Confirmed');

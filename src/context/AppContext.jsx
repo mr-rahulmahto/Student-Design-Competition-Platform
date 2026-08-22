@@ -288,17 +288,35 @@ const normalizeCompetition = (competition) => ({
   startDate: competition.startDate
 });
 
-const normalizeSubmission = (submission) => ({
-  ...submission,
-  id: submission.id || submission._id,
-  competitionId: submission.competitionId?._id || submission.competitionId,
-  studentId: submission.studentId?._id || submission.studentId,
-  competitionTitle: submission.competitionId?.title || submission.competitionTitle,
-  organizer: submission.competitionId?.organizer || submission.organizer,
-  studentName: submission.studentId?.name || submission.studentName,
-  studentEmail: submission.studentId?.email || submission.studentEmail,
-  studentAvatar: submission.studentId?.avatar || submission.studentAvatar
-});
+const normalizeSubmission = (submission) => {
+  if (!submission) return null;
+  const comp = typeof submission.competitionId === 'object' && submission.competitionId !== null
+    ? submission.competitionId
+    : null;
+  const student = typeof submission.studentId === 'object' && submission.studentId !== null
+    ? submission.studentId
+    : null;
+
+  const rawId = submission._id || submission.id || '';
+  const compId = comp ? (comp._id || comp.id) : (submission.competitionId || '');
+  const studId = student ? (student._id || student.id) : (submission.studentId || '');
+
+  return {
+    ...submission,
+    id: String(rawId),
+    _id: String(rawId),
+    competitionId: String(compId),
+    studentId: String(studId),
+    competitionTitle: submission.competitionTitle || comp?.title || 'Design Competition',
+    organizer: submission.organizer || comp?.organizer || '',
+    studentName: submission.studentName || student?.name || 'Student',
+    studentEmail: submission.studentEmail || student?.email || '',
+    studentAvatar: submission.studentAvatar || student?.avatar || '',
+    submittedAt: submission.submittedAt || new Date().toISOString(),
+    files: Array.isArray(submission.files) ? submission.files : [],
+    links: Array.isArray(submission.links) ? submission.links : []
+  };
+};
 
 const normalizeUser = (apiUser) => ({
   ...guestUser,
@@ -757,19 +775,26 @@ export const AppProvider = ({ children }) => {
   };
 
   const updateSubmission = async (subId, updatedData) => {
+    const tokenToUse = authToken || localStorage.getItem('designpulse_auth_token');
     try {
-      const data = await requestApi(`/submissions/${subId}`, {
+      const response = await fetch(`${API_BASE_URL}/submissions/${subId}`, {
         method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(tokenToUse ? { 'Authorization': `Bearer ${tokenToUse}` } : {})
+        },
         body: JSON.stringify(updatedData)
       });
-      if (data && data.submission) {
+      const data = await response.json().catch(() => ({}));
+      if (response.ok && data.success && data.submission) {
         const updated = normalizeSubmission(data.submission);
         setSubmissions(prev => prev.map(s => s.id === subId ? updated : s));
-        addNotification('Submission Updated', 'Project changes were saved.', 'success');
+        addNotification('Submission Updated', 'Project changes were saved to MongoDB.', 'success');
+        if (tokenToUse) loadSubmissions(tokenToUse);
         return updated;
       }
-    } catch {
-      // Fallback
+    } catch (err) {
+      console.error('Update submission error:', err);
     }
 
     setSubmissions(prev => prev.map(s => s.id === subId ? { ...s, ...updatedData } : s));
@@ -778,19 +803,26 @@ export const AppProvider = ({ children }) => {
   };
 
   const updateSubmissionStatus = async (subId, newStatus, notes) => {
+    const tokenToUse = authToken || localStorage.getItem('designpulse_auth_token');
     try {
-      const data = await requestApi(`/submissions/${subId}/status`, {
+      const response = await fetch(`${API_BASE_URL}/submissions/${subId}/status`, {
         method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(tokenToUse ? { 'Authorization': `Bearer ${tokenToUse}` } : {})
+        },
         body: JSON.stringify({ status: newStatus, evaluatorNotes: notes })
       });
-      if (data && data.submission) {
+      const data = await response.json().catch(() => ({}));
+      if (response.ok && data.success && data.submission) {
         const updated = normalizeSubmission(data.submission);
         setSubmissions(prev => prev.map(s => s.id === subId ? updated : s));
-        addNotification('Status Updated', `Submission marked "${newStatus}".`, 'success');
+        addNotification('Status Updated', `Submission marked "${newStatus}" in MongoDB.`, 'success');
+        if (tokenToUse) loadSubmissions(tokenToUse);
         return updated;
       }
-    } catch {
-      // Fallback
+    } catch (err) {
+      console.error('Update status error:', err);
     }
 
     setSubmissions(prev => prev.map(s => s.id === subId ? { ...s, status: newStatus, evaluatorNotes: notes } : s));

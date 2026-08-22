@@ -76,10 +76,6 @@ router.post('/', protect, async (req, res) => {
       links
     } = req.body;
 
-    if (req.user.role !== 'student') {
-      return res.status(403).json({ success: false, message: 'Only student accounts can submit projects.' });
-    }
-
     if (!competitionId || !projectTitle || !summary) {
       return res.status(400).json({ success: false, message: 'Competition ID, project title, and summary are required.' });
     }

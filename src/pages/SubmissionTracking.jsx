@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useApp } from '../context/AppContext';
 import { StatusBadge } from '../components/StatusBadge';
 import { 
@@ -13,8 +13,14 @@ import {
 } from 'lucide-react';
 
 export const SubmissionTracking = () => {
-  const { submissions, navigateTo } = useApp();
+  const { submissions, navigateTo, loadSubmissions } = useApp();
   const [activeSubmissionId, setActiveSubmissionId] = useState(submissions[0]?.id || null);
+
+  useEffect(() => {
+    if (loadSubmissions) {
+      loadSubmissions();
+    }
+  }, [loadSubmissions]);
 
   const activeSubmission = submissions.find(s => s.id === activeSubmissionId) || submissions[0];
 
