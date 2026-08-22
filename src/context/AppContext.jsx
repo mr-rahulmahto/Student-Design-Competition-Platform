@@ -773,7 +773,16 @@ export const AppProvider = ({ children }) => {
     return true;
   };
 
+  // Routes that require authentication
+  const PROTECTED_ROUTES = ['dashboard', 'profile', 'submit', 'my-submissions', 'admin'];
+
   const navigateTo = (route, compId = null, subId = null) => {
+    // If not authenticated and trying to access a protected route, show login modal
+    if (!isAuthenticated && PROTECTED_ROUTES.includes(route)) {
+      const targetRole = route === 'admin' ? 'admin' : 'student';
+      openAuthModal('login', targetRole);
+      return;
+    }
     setCurrentRoute(route);
     if (compId !== null) setSelectedCompetitionId(compId);
     if (subId !== null) setSelectedSubmissionId(subId);
