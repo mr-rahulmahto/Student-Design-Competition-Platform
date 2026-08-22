@@ -17,6 +17,7 @@ import {
 export const StudentDashboard = () => {
   const { 
     user, 
+    isAuthenticated,
     submissions, 
     competitions, 
     savedCompetitions, 
@@ -26,10 +27,10 @@ export const StudentDashboard = () => {
   } = useApp();
 
   useEffect(() => {
-    if (loadSubmissions) {
+    if (isAuthenticated && loadSubmissions) {
       loadSubmissions();
     }
-  }, [loadSubmissions]);
+  }, [isAuthenticated, loadSubmissions]);
 
   const activeSubmissions = submissions.filter(s => s.status !== 'Draft');
   const confirmedSubmissions = submissions.filter(s => s.status === 'Confirmed');

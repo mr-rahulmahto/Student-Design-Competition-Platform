@@ -57,10 +57,10 @@ export const AdminPanel = () => {
   const activeSub = submissions.find(s => s.id === selectedSubId) || submissions[0];
 
   useEffect(() => {
-    if (user.role === 'admin') {
+    if (isAuthenticated && user.role === 'admin') {
       loadSubmissions();
     }
-  }, [user.role, activeTab, loadSubmissions]);
+  }, [isAuthenticated, user.role, activeTab, loadSubmissions]);
 
   useEffect(() => {
     if ((!selectedSubId || !submissions.some(s => s.id === selectedSubId)) && submissions.length > 0) {

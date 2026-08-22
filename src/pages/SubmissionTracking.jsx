@@ -13,14 +13,14 @@ import {
 } from 'lucide-react';
 
 export const SubmissionTracking = () => {
-  const { submissions, navigateTo, loadSubmissions } = useApp();
+  const { submissions, navigateTo, loadSubmissions, isAuthenticated } = useApp();
   const [activeSubmissionId, setActiveSubmissionId] = useState(submissions[0]?.id || null);
 
   useEffect(() => {
-    if (loadSubmissions) {
+    if (isAuthenticated && loadSubmissions) {
       loadSubmissions();
     }
-  }, [loadSubmissions]);
+  }, [isAuthenticated, loadSubmissions]);
 
   const activeSubmission = submissions.find(s => s.id === activeSubmissionId) || submissions[0];
 

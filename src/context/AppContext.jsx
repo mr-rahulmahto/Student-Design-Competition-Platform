@@ -359,17 +359,24 @@ export const AppProvider = ({ children }) => {
   }), [authToken]);
 
   const requestApi = useCallback(async (path, options = {}) => {
+    const token = authToken || localStorage.getItem('designpulse_auth_token');
     try {
       const response = await fetch(`${API_BASE_URL}${path}`, {
         ...options,
         headers: {
           ...(options.body ? { 'Content-Type': 'application/json' } : {}),
-          ...(authToken ? { Authorization: `Bearer ${authToken}` } : {}),
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
           ...(options.headers || {})
         }
       });
 
       const data = await response.json().catch(() => ({}));
+      if (response.status === 401) {
+        setAuthToken('');
+        setIsAuthenticated(false);
+        localStorage.removeItem('designpulse_auth_token');
+        return null;
+      }
       if (!response.ok || data.success === false) {
         throw new Error(data.message || `Request failed: ${response.status}`);
       }
@@ -408,6 +415,12 @@ export const AppProvider = ({ children }) => {
         }
       });
       const data = await response.json().catch(() => ({}));
+      if (response.status === 401) {
+        setAuthToken('');
+        setIsAuthenticated(false);
+        localStorage.removeItem('designpulse_auth_token');
+        return;
+      }
       if (data && data.success && Array.isArray(data.submissions)) {
         setSubmissions(data.submissions.map(normalizeSubmission));
       }
