@@ -118,7 +118,10 @@ export const SubmissionWorkbench = () => {
       ]
     };
 
-    const saved = editingSubmission
+    // Check if editingSubmission is a real MongoDB document (24-hex ObjectId) vs sample template 'sub-101'
+    const isRealMongoId = editingSubmission && /^[0-9a-fA-F]{24}$/.test(editingSubmission.id);
+
+    const saved = isRealMongoId
       ? await updateSubmission(editingSubmission.id, submissionPayload)
       : await createSubmission(submissionPayload);
 

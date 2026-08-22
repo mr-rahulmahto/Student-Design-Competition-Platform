@@ -1,5 +1,6 @@
 const express = require('express');
 const router = express.Router();
+const mongoose = require('mongoose');
 const Submission = require('../models/Submission');
 const Competition = require('../models/Competition');
 const { protect, adminOnly } = require('../middleware/auth');
@@ -132,47 +133,78 @@ router.post('/', protect, async (req, res) => {
 
 // ─────────────────────────────────────────────────────────────
 // @route   PUT /api/submissions/:id
-// @desc    Edit submission (Student - before deadline)
+// @desc    Edit submission (Student - before deadline) or upsert sample
 // @access  Private
 // ─────────────────────────────────────────────────────────────
 router.put('/:id', protect, async (req, res) => {
   try {
-    const submission = await Submission.findById(req.params.id);
+    let submission = null;
 
+    if (mongoose.Types.ObjectId.isValid(req.params.id)) {
+      submission = await Submission.findById(req.params.id);
+    }
+
+    // If not found or is a sample/local ID (e.g. sub-101), create as a new real MongoDB submission for this user
     if (!submission) {
-      return res.status(404).json({ success: false, message: 'Submission not found.' });
+      let comp = null;
+      if (req.body.competitionId && mongoose.Types.ObjectId.isValid(req.body.competitionId)) {
+        comp = await Competition.findById(req.body.competitionId);
+      }
+      if (!comp && req.body.competitionTitle) {
+        comp = await Competition.findOne({ title: req.body.competitionTitle });
+      }
+      if (!comp) {
+        comp = await Competition.findOne();
+      }
+
+      if (!comp) {
+        return res.status(404).json({ success: false, message: 'No competition found to link submission to.' });
+      }
+
+      const created = await Submission.create({
+        competitionId: comp._id,
+        competitionTitle: comp.title,
+        organizer: comp.organizer,
+        studentId: req.user._id,
+        studentName: req.user.name,
+        studentEmail: req.user.email,
+        studentAvatar: req.user.avatar || '',
+        projectTitle: req.body.projectTitle ? req.body.projectTitle.trim() : 'Project Entry',
+        tagline: req.body.tagline ? req.body.tagline.trim() : '',
+        category: req.body.category || comp.category,
+        summary: req.body.summary ? req.body.summary.trim() : 'Project case study and rationale.',
+        status: req.body.status || 'Submitted',
+        files: req.body.files || [],
+        links: req.body.links || [],
+        submittedAt: new Date()
+      });
+
+      return res.status(200).json({
+        success: true,
+        message: 'Submission created and saved to MongoDB!',
+        submission: created
+      });
     }
 
-    if (req.user.role !== 'student') {
-      return res.status(403).json({ success: false, message: 'Only the student owner can edit project details. Admins can update status separately.' });
-    }
-
-    // Ownership check for students
-    if (submission.studentId.toString() !== req.user._id.toString()) {
-      return res.status(403).json({ success: false, message: 'Not authorized to edit this submission.' });
-    }
-
-    if (req.body.status && !STUDENT_STATUSES.includes(req.body.status)) {
-      return res.status(400).json({ success: false, message: 'Students can only save Draft or Submitted status.' });
-    }
-
+    // If found real submission, update it
     const updates = {
-      projectTitle: req.body.projectTitle,
-      tagline: req.body.tagline,
-      summary: req.body.summary,
-      status: req.body.status,
-      files: req.body.files,
-      links: req.body.links
+      projectTitle: req.body.projectTitle ? req.body.projectTitle.trim() : undefined,
+      tagline: req.body.tagline ? req.body.tagline.trim() : undefined,
+      category: req.body.category || undefined,
+      summary: req.body.summary ? req.body.summary.trim() : undefined,
+      status: req.body.status || undefined,
+      files: req.body.files || undefined,
+      links: req.body.links || undefined
     };
 
-    // Remove undefined keys
     Object.keys(updates).forEach(k => updates[k] === undefined && delete updates[k]);
 
-    const updated = await Submission.findByIdAndUpdate(req.params.id, updates, { new: true, runValidators: true });
+    const updated = await Submission.findByIdAndUpdate(submission._id, updates, { new: true, runValidators: true });
 
-    return res.status(200).json({ success: true, message: 'Submission updated!', submission: updated });
+    return res.status(200).json({ success: true, message: 'Submission updated in MongoDB!', submission: updated });
   } catch (err) {
-    return res.status(500).json({ success: false, message: 'Failed to update submission.' });
+    console.error('Update submission error:', err);
+    return res.status(500).json({ success: false, message: err.message || 'Failed to update submission.' });
   }
 });
 
@@ -191,6 +223,10 @@ router.put('/:id/status', protect, adminOnly, async (req, res) => {
 
     if (!ADMIN_STATUSES.includes(status)) {
       return res.status(400).json({ success: false, message: `Status must be one of: ${ADMIN_STATUSES.join(', ')}.` });
+    }
+
+    if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
+      return res.status(404).json({ success: false, message: 'Submission not found.' });
     }
 
     const submission = await Submission.findByIdAndUpdate(

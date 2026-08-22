@@ -1,5 +1,6 @@
 const express = require('express');
 const router = express.Router();
+const mongoose = require('mongoose');
 const Competition = require('../models/Competition');
 const { protect, adminOnly } = require('../middleware/auth');
 
@@ -53,7 +54,10 @@ router.get('/', async (req, res) => {
 // ─────────────────────────────────────────────────────────────
 router.get('/:id', async (req, res) => {
   try {
-    const competition = await Competition.findById(req.params.id).populate('createdBy', 'name');
+    let competition = null;
+    if (mongoose.Types.ObjectId.isValid(req.params.id)) {
+      competition = await Competition.findById(req.params.id).populate('createdBy', 'name');
+    }
 
     if (!competition) {
       return res.status(404).json({ success: false, message: 'Competition not found.' });
@@ -133,6 +137,10 @@ router.post('/', protect, adminOnly, async (req, res) => {
 // ─────────────────────────────────────────────────────────────
 router.put('/:id', protect, adminOnly, async (req, res) => {
   try {
+    if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
+      return res.status(404).json({ success: false, message: 'Competition not found.' });
+    }
+
     const competition = await Competition.findById(req.params.id);
 
     if (!competition) {
@@ -157,6 +165,10 @@ router.put('/:id', protect, adminOnly, async (req, res) => {
 // ─────────────────────────────────────────────────────────────
 router.delete('/:id', protect, adminOnly, async (req, res) => {
   try {
+    if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
+      return res.status(404).json({ success: false, message: 'Competition not found.' });
+    }
+
     const competition = await Competition.findById(req.params.id);
 
     if (!competition) {
