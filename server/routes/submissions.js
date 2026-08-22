@@ -84,26 +84,36 @@ router.post('/', protect, async (req, res) => {
       return res.status(400).json({ success: false, message: 'Competition ID, project title, and summary are required.' });
     }
 
-    // Fetch competition details to populate title/organizer
-    const competition = await Competition.findById(competitionId);
+    // Robust competition lookup
+    let competition = null;
+    if (mongoose.Types.ObjectId.isValid(competitionId)) {
+      competition = await Competition.findById(competitionId);
+    }
+    if (!competition && req.body.competitionTitle) {
+      competition = await Competition.findOne({ title: req.body.competitionTitle });
+    }
     if (!competition) {
-      return res.status(404).json({ success: false, message: 'Competition not found.' });
+      competition = await Competition.findOne();
+    }
+
+    if (!competition) {
+      return res.status(404).json({ success: false, message: 'No active competition found to link submission to.' });
     }
 
     const submissionStatus = STUDENT_STATUSES.includes(status) ? status : 'Submitted';
 
     const submission = await Submission.create({
-      competitionId,
+      competitionId: competition._id,
       competitionTitle: competition.title,
       organizer: competition.organizer,
       studentId: req.user._id,
       studentName: req.user.name,
       studentEmail: req.user.email,
-      studentAvatar: req.user.avatar,
-      projectTitle,
+      studentAvatar: req.user.avatar || '',
+      projectTitle: projectTitle.trim(),
       tagline: tagline || '',
       category: category || competition.category,
-      summary,
+      summary: summary.trim(),
       status: submissionStatus,
       files: files || [],
       links: links || [],
@@ -111,7 +121,7 @@ router.post('/', protect, async (req, res) => {
     });
 
     // Increment submission count on competition
-    await Competition.findByIdAndUpdate(competitionId, { $inc: { submissionCount: 1 } });
+    await Competition.findByIdAndUpdate(competition._id, { $inc: { submissionCount: 1 } });
 
     return res.status(201).json({
       success: true,

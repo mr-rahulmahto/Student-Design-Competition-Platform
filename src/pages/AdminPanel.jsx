@@ -26,6 +26,7 @@ export const AdminPanel = () => {
     deleteCompetition, 
     submissions, 
     updateSubmissionStatus,
+    loadSubmissions,
     navigateTo,
     addNotification
   } = useApp();
@@ -53,10 +54,16 @@ export const AdminPanel = () => {
   const [evalStatus, setEvalStatus] = useState('Under Process');
   const [evalNotes, setEvalNotes] = useState('');
 
-  const activeSub = submissions.find(s => s.id === selectedSubId);
+  const activeSub = submissions.find(s => s.id === selectedSubId) || submissions[0];
 
   useEffect(() => {
-    if (!selectedSubId && submissions.length > 0) {
+    if (user.role === 'admin') {
+      loadSubmissions();
+    }
+  }, [user.role, activeTab, loadSubmissions]);
+
+  useEffect(() => {
+    if ((!selectedSubId || !submissions.some(s => s.id === selectedSubId)) && submissions.length > 0) {
       setSelectedSubId(submissions[0].id);
       setEvalStatus(submissions[0].status || 'Under Process');
       setEvalNotes(submissions[0].evaluatorNotes || '');
@@ -363,31 +370,49 @@ export const AdminPanel = () => {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           {/* Submissions List */}
           <div className="space-y-3">
-            <h3 className="text-xs font-bold uppercase tracking-wider text-slate-500 font-heading">
-              Select Entry to Evaluate
-            </h3>
-            {submissions.map(sub => (
-              <div
-                key={sub.id}
+            <div className="flex items-center justify-between">
+              <h3 className="text-xs font-bold uppercase tracking-wider text-slate-500 font-heading">
+                Entries ({submissions.length})
+              </h3>
+              <button
                 onClick={() => {
-                  setSelectedSubId(sub.id);
-                  setEvalStatus(sub.status);
-                  setEvalNotes(sub.evaluatorNotes || '');
+                  loadSubmissions();
+                  addNotification('Refreshed', 'Fetched latest submissions from MongoDB.', 'info');
                 }}
-                className={`p-4 rounded-2xl border transition-all cursor-pointer space-y-2 ${
-                  selectedSubId === sub.id
-                    ? 'bg-purple-50 border-purple-300 shadow-2xs'
-                    : 'bg-white border-slate-200 hover:bg-slate-50'
-                }`}
+                className="text-[11px] font-bold text-purple-600 hover:text-purple-800 bg-purple-50 hover:bg-purple-100 px-2.5 py-1 rounded-lg transition-all"
               >
-                <div className="flex justify-between items-center text-[10px]">
-                  <span className="font-bold text-purple-700">{sub.studentName}</span>
-                  <StatusBadge status={sub.status} type="submission" />
-                </div>
-                <h4 className="text-xs font-bold text-slate-900 font-heading line-clamp-1">{sub.projectTitle}</h4>
-                <p className="text-[10px] text-slate-500 line-clamp-1">{sub.competitionTitle}</p>
+                ↻ Sync Live
+              </button>
+            </div>
+            {submissions.length === 0 ? (
+              <div className="p-6 rounded-2xl bg-white border border-slate-200 text-center space-y-1">
+                <p className="text-xs font-bold text-slate-700">No submissions yet</p>
+                <p className="text-[11px] text-slate-400">Student submissions will appear here once submitted.</p>
               </div>
-            ))}
+            ) : (
+              submissions.map(sub => (
+                <div
+                  key={sub.id}
+                  onClick={() => {
+                    setSelectedSubId(sub.id);
+                    setEvalStatus(sub.status);
+                    setEvalNotes(sub.evaluatorNotes || '');
+                  }}
+                  className={`p-4 rounded-2xl border transition-all cursor-pointer space-y-2 ${
+                    selectedSubId === sub.id
+                      ? 'bg-purple-50 border-purple-300 shadow-2xs'
+                      : 'bg-white border-slate-200 hover:bg-slate-50'
+                  }`}
+                >
+                  <div className="flex justify-between items-center text-[10px]">
+                    <span className="font-bold text-purple-700">{sub.studentName}</span>
+                    <StatusBadge status={sub.status} type="submission" />
+                  </div>
+                  <h4 className="text-xs font-bold text-slate-900 font-heading line-clamp-1">{sub.projectTitle}</h4>
+                  <p className="text-[10px] text-slate-500 line-clamp-1">{sub.competitionTitle}</p>
+                </div>
+              ))
+            )}
           </div>
 
           {/* Evaluation Controls */}

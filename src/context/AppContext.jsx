@@ -380,17 +380,27 @@ export const AppProvider = ({ children }) => {
     }
   }, [requestApi]);
 
-  const loadSubmissions = useCallback(async () => {
-    if (!authToken) return;
-    const data = await requestApi('/submissions');
-    if (data && data.submissions && data.submissions.length > 0) {
-      setSubmissions(data.submissions.map(normalizeSubmission));
+  const loadSubmissions = useCallback(async (customToken) => {
+    const tokenToUse = customToken || authToken || localStorage.getItem('designpulse_auth_token');
+    if (!tokenToUse) return;
+    try {
+      const response = await fetch(`${API_BASE_URL}/submissions`, {
+        headers: {
+          'Authorization': `Bearer ${tokenToUse}`
+        }
+      });
+      const data = await response.json().catch(() => ({}));
+      if (data && data.success && Array.isArray(data.submissions)) {
+        setSubmissions(data.submissions.map(normalizeSubmission));
+      }
+    } catch (err) {
+      console.error('Failed to load submissions:', err);
     }
-  }, [authToken, requestApi]);
+  }, [authToken]);
 
-  const refreshAllData = useCallback(async () => {
+  const refreshAllData = useCallback(async (customToken) => {
     setIsLoadingData(true);
-    await Promise.all([loadCompetitions(), loadSubmissions()]);
+    await Promise.all([loadCompetitions(), loadSubmissions(customToken)]);
     setIsLoadingData(false);
   }, [loadCompetitions, loadSubmissions]);
 
@@ -399,8 +409,10 @@ export const AppProvider = ({ children }) => {
   }, [loadCompetitions]);
 
   useEffect(() => {
-    loadSubmissions();
-  }, [loadSubmissions]);
+    if (authToken) {
+      loadSubmissions(authToken);
+    }
+  }, [authToken, loadSubmissions]);
 
   useEffect(() => {
     localStorage.setItem('designpulse_user', JSON.stringify(user));
@@ -456,7 +468,8 @@ export const AppProvider = ({ children }) => {
         setShowAuthModal(false);
         setCurrentRoute(loggedUser.role === 'admin' ? 'admin' : 'dashboard');
         addNotification('Signed In Successfully', `Welcome back, ${loggedUser.name}!`, 'success');
-        refreshAllData();
+        loadSubmissions(data.token);
+        loadCompetitions();
         return true;
       } else {
         const errorMsg = data.message || 'Incorrect credentials. Please check your email and password.';
@@ -697,6 +710,13 @@ export const AppProvider = ({ children }) => {
   };
 
   const createSubmission = async (subData) => {
+    const tokenToUse = authToken || localStorage.getItem('designpulse_auth_token');
+    if (!tokenToUse) {
+      addNotification('Sign In Required', 'Please sign in with a student account to submit your project.', 'warning');
+      openAuthModal('login', 'student');
+      return null;
+    }
+
     // Ensure competitionId is always a plain string (MongoDB ObjectId)
     const compId = String(subData.competitionId || '');
     const comp = competitions.find(c => c.id === compId || c._id === compId) || competitions[0];
@@ -706,17 +726,22 @@ export const AppProvider = ({ children }) => {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          ...(authToken ? { Authorization: `Bearer ${authToken}` } : {})
+          'Authorization': `Bearer ${tokenToUse}`
         },
-        body: JSON.stringify({ ...subData, competitionId: comp._id || comp.id || compId })
+        body: JSON.stringify({
+          ...subData,
+          competitionId: comp ? (comp._id || comp.id || compId) : compId,
+          competitionTitle: comp ? comp.title : (subData.competitionTitle || 'Student Design Competition')
+        })
       });
 
       const data = await response.json().catch(() => ({}));
 
       if (response.ok && data.success && data.submission) {
         const created = normalizeSubmission(data.submission);
-        setSubmissions(prev => [created, ...prev]);
-        addNotification('Submission Received! 🚀', `Your entry for "${created.competitionTitle}" was submitted to MongoDB.`, 'success');
+        setSubmissions(prev => [created, ...prev.filter(s => s.id !== created.id)]);
+        addNotification('Submission Received! 🚀', `Your entry for "${created.competitionTitle}" was saved to MongoDB.`, 'success');
+        loadSubmissions(tokenToUse);
         return created;
       } else {
         const errMsg = data.message || 'Failed to save submission.';
@@ -826,6 +851,7 @@ export const AppProvider = ({ children }) => {
       createSubmission,
       updateSubmission,
       updateSubmissionStatus,
+      loadSubmissions,
       refreshAllData,
       navigateTo,
       addNotification,
